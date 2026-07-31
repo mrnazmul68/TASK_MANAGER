@@ -1,7 +1,9 @@
-let isShuttingDown = false
+import {logger} from "./src/utils/logger.js";
 
-const shutdown = async (signal:string):Promise<void>=>{
-  if(isShuttingDown)return
-  isShuttingDown = true
-  console.log("Shutting down gracefully")
-}
+let isShuttingDown = false;
+
+const shutdown = async (signal: string): Promise<void> => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  logger.info("Shutting down gracefully");
+};
