@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "dev": "tsx watch server.ts --env-file=.env",
+    "dev": "nodemon --exec \"tsx --env-file=.env\" server.ts",
     "build": "tsc"
   },
   "keywords": [],
