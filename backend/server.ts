@@ -1,24 +1,30 @@
 import type { Server } from "node:http";
 import { env } from "./src/config/env.js";
-import { app } from "./src/app.js";
 import { logger } from "./src/utils/logger.js";
 import { disconnectDB } from "./src/config/disconnectDB.js";
-import { error } from "node:console";
+import { connectDB } from "./src/config/connectDB.js";
 
 let server: Server | null = null;
 let isShuttingdown = false;
 
 const PORT: number = env.PORT;
+const TIMER = 10_000;
 
+//start server
+const startServer = async (): Promise<void> => {
+  await connectDB();
+};
+
+//shutdown
 const shutdown = async (signal: string): Promise<void> => {
   if (isShuttingdown) return;
   isShuttingdown = true;
   logger.info({ signal }, "Server is shutting down gracefully...");
 
   const forceTimeOut = setTimeout(() => {
-    logger.info({ signal }, "Server is shutting down forcefully");
+    logger.info({ TIMEOUT: TIMER }, "Server is shutting down forcefully");
     process.exit(1);
-  }, 10_000);
+  }, TIMER);
   forceTimeOut.unref();
 
   try {
