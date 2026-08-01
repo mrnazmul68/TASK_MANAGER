@@ -46,11 +46,11 @@ const shutdown = async (signal: string): Promise<void> => {
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.once("uncaughtException", (reasons: unknown) => {
-  logger.info({ error: reasons }, "Shutdown due to Uncaught-exception");
-  shutdown("uncaughtException");
-});
-process.once("unhandledRejection", (error: Error) => {
-  logger.info({ error }, "Shutdown due to Unhandled-rejection");
+process.once("unhandledRejection", (reasons: unknown) => {
+  logger.info({ error: reasons }, "Shutdown due to Unhandled-rejection");
   shutdown("unhandledRejection");
+});
+process.once("uncaughtException", (error: Error) => {
+  logger.info({ error }, "Shutdown due to Uncaught-exception");
+  shutdown("uncaughtException");
 });
