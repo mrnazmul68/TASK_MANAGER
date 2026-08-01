@@ -3,6 +3,7 @@ import { env } from "./src/config/env.js";
 import { app } from "./src/app.js";
 import { logger } from "./src/utils/logger.js";
 import { disconnectDB } from "./src/config/disconnectDB.js";
+import { error } from "node:console";
 
 let server: Server | null = null;
 let isShuttingdown = false;
@@ -36,3 +37,14 @@ const shutdown = async (signal: string): Promise<void> => {
     process.exit(1);
   }
 };
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.once("uncaughtException", (reasons: unknown) => {
+  logger.info({ reasons: error }, "Shutdown due to Uncaught-exception");
+  shutdown("uncaughtException");
+});
+process.once("unhandledRejection", (error: Error) => {
+  logger.info({ error }, "Shutdown due to Unhandled-rejection");
+  shutdown("unhandledRejection");
+});
