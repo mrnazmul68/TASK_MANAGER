@@ -1,11 +1,37 @@
-import mongoose from "mongoose";
+import mongoose, { type ConnectOptions } from "mongoose";
 import { env } from "./env.js";
 import { logger } from "../utils/logger.js";
 
-export const connectDB = async () => {
-  if (mongoose.connection.readyState === 1) return;
+mongoose.connection.on("error", (error) => {
+  logger.error({ error }, "Mongodb connection error");
+});
 
-  const connect = await mongoose.connect(env.MONGODB_URI);
+mongoose.connection.on("disconnected", () => {
+  logger.warn("Mongodb disconnected");
+});
+
+mongoose.connection.on("reconnected", () => {
+  logger.info("Mongodb reconnected");
+});
+
+const isProduction = env.NODE_ENV === "production";
+
+const CONNECTION_OPTIONS: ConnectOptions = {
+  maxPoolSize: isProduction ? 100 : 10,
+  minPoolSize: isProduction ? 10 : 2,
+  serverSelectionTimeoutMS: 5_000,
+  socketTimeoutMS: 45_000,
+  heartbeatFrequencyMS: 10_00,
+  compressors: ["snappy", "zstd"],
+};
+
+export const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) {
+    logger.info("DB is already connected");
+    return;
+  }
+
+  const connect = await mongoose.connect(env.MONGODB_URI, CONNECTION_OPTIONS);
   logger.info(
     {
       HOST: connect.connection.host,
