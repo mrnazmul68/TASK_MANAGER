@@ -3,29 +3,60 @@ import { env } from "./src/config/env.js";
 import { logger } from "./src/utils/logger.js";
 import { disconnectDB } from "./src/config/disconnectDB.js";
 import { connectDB } from "./src/config/connectDB.js";
+import { app } from "./src/app.js";
 
 let server: Server | null = null;
-let isShuttingdown = false;
+let isShuttingDown = false;
 
 const PORT: number = env.PORT;
-const TIMER = 10_000;
+const SHUTDOWN_TIMEOUT = 10_000;
 
-//start server
+// start server
 const startServer = async (): Promise<void> => {
   await connectDB();
+
+  server = app.listen(PORT, () => {
+    logger.info(
+      {
+        PORT: PORT,
+        ENV: env.NODE_ENV,
+        PID: process.pid,
+        VERSION: process.version,
+      },
+      "Server is running",
+    );
+    logger.info({ API: `http://localhost:${PORT}/api/v1/` });
+  });
+
+  server.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EADDRINUSE") {
+      logger.fatal({ error }, `Port ${PORT} is already in use`);
+    } else if (error.code === "EACCES") {
+      logger.fatal({ error }, `Permission denied to bind port ${PORT}`);
+    } else {
+      logger.fatal({ error }, "Unexpected server error, shutting down");
+    }
+    process.exit(1);
+  });
 };
 
-//shutdown
+// shutdown
 const shutdown = async (signal: string): Promise<void> => {
-  if (isShuttingdown) return;
-  isShuttingdown = true;
-  logger.info({ signal }, "Server is shutting down gracefully...");
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  logger.info(
+    { signal },
+    "Shutdown signal received, starting graceful shutdown...",
+  );
 
-  const forceTimeOut = setTimeout(() => {
-    logger.info({ TIMEOUT: TIMER }, "Server is shutting down forcefully");
+  const forceTimeout = setTimeout(() => {
+    logger.warn(
+      { timeoutMs: SHUTDOWN_TIMEOUT },
+      "Graceful shutdown timed out, forcing exit",
+    );
     process.exit(1);
-  }, TIMER);
-  forceTimeOut.unref();
+  }, SHUTDOWN_TIMEOUT);
+  forceTimeout.unref();
 
   try {
     if (server) {
@@ -35,22 +66,29 @@ const shutdown = async (signal: string): Promise<void> => {
       });
     }
     await disconnectDB();
-    clearTimeout(forceTimeOut);
-    logger.info("HTTP server closed, gracefull shutdown completed");
+    clearTimeout(forceTimeout);
+    logger.info("HTTP server closed, graceful shutdown completed");
     process.exit(0);
   } catch (error) {
-    logger.error({ error }, "Error during gracefull shutdown");
+    logger.fatal({ error }, "Graceful shutdown failed");
     process.exit(1);
   }
 };
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.once("unhandledRejection", (reasons: unknown) => {
-  logger.info({ error: reasons }, "Shutdown due to Unhandled-rejection");
+process.once("unhandledRejection", (reason: unknown) => {
+  logger.fatal({ error: reason }, "Unhandled promise rejection, shutting down");
   shutdown("unhandledRejection");
 });
 process.once("uncaughtException", (error: Error) => {
-  logger.info({ error }, "Shutdown due to Uncaught-exception");
+  logger.fatal({ error }, "Uncaught exception, shutting down");
   shutdown("uncaughtException");
 });
+
+try {
+  await startServer();
+} catch (error) {
+  logger.fatal({ error }, "Failed to start server");
+  process.exit(1);
+}

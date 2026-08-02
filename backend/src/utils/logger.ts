@@ -1,11 +1,11 @@
 import pino from "pino";
 import { env } from "../config/env.js";
 
-const defaultLevel = env.NODE_ENV === "development" ? "debug" : "info";
+const DEFAULT_LEVEL = env.NODE_ENV === "development" ? "debug" : "info";
 
 export const logger = pino({
   name: "TASK_MANAGER_APP",
-  level: env.LOG_LEVEL ?? defaultLevel,
+  level: env.LOG_LEVEL ?? DEFAULT_LEVEL,
   redact: {
     paths: [
       "req.headers.authorization",

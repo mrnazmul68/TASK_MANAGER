@@ -25,6 +25,8 @@ if (!parsed.success) {
   process.exit(1);
 }
 
+/*z.infer হলো Zod এর একটা utility type যেটা একটা Zod
+schema থেকে automatically TypeScript type বের করে দেয়*/
 type Env = z.infer<typeof envSchema>;
 //  type Env = {
 //   PORT: number;
