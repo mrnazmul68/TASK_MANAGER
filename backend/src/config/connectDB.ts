@@ -22,7 +22,12 @@ const CONNECTION_OPTIONS: ConnectOptions = {
   serverSelectionTimeoutMS: 5_000,
   socketTimeoutMS: 45_000,
   heartbeatFrequencyMS: 10_00,
+  retryWrites: true,
   compressors: ["snappy", "zstd"],
+  ...(isProduction && {
+    w: "majority",
+    readPreference: "secondaryPreferred" as const,
+  }),
 };
 
 export const connectDB = async () => {
