@@ -21,7 +21,7 @@ const CONNECTION_OPTIONS: ConnectOptions = {
   minPoolSize: isProduction ? 10 : 2,
   serverSelectionTimeoutMS: 5_000,
   socketTimeoutMS: 45_000,
-  heartbeatFrequencyMS: 10_00,
+  heartbeatFrequencyMS: 10_000,
   retryWrites: true,
   compressors: ["snappy", "zstd"],
   ...(isProduction && {

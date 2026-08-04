@@ -16,7 +16,9 @@ const envSchema = z.object({
     .trim()
     .min(1, "Mongodb uri is required")
     .max(500, "Mongodb uri cannot be exceed 1000 characters")
-    .startsWith("mongodb", { message: "MongoDB uri must start with mongodb" }),
+    .startsWith("mongodb", {
+      message: "MongoDB uri must start with mongodb",
+    }),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -25,13 +27,16 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-/*z.infer হলো Zod এর একটা utility type যেটা একটা Zod
-schema থেকে automatically TypeScript type বের করে দেয়*/
-type Env = z.infer<typeof envSchema>;
-//  type Env = {
-//   PORT: number;
-//   NODE_ENV: "development" | "production";
-//   MONGODB_URI: string;
-// }
+const data = parsed.data;
 
-export const env: Env = Object.freeze(parsed.data);
+type ParsedEnv = z.infer<typeof envSchema>;
+export type Env = Readonly<
+  ParsedEnv & {
+    readonly isDevelopment: boolean;
+  }
+>;
+
+export const env = Object.freeze({
+  ...data,
+  isDevelopment: data.NODE_ENV === "development",
+});

@@ -1,4 +1,4 @@
-import type { Server } from "node:http";
+import { type Server } from "node:http";
 import { env } from "./src/config/env.js";
 import { logger } from "./src/utils/logger.js";
 import { disconnectDB } from "./src/config/disconnectDB.js";
