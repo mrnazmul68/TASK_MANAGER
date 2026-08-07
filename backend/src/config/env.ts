@@ -33,10 +33,12 @@ type ParsedEnv = z.infer<typeof envSchema>;
 export type Env = Readonly<
   ParsedEnv & {
     readonly isDevelopment: boolean;
+    readonly isProduction: boolean;
   }
 >;
 
 export const env = Object.freeze({
   ...data,
   isDevelopment: data.NODE_ENV === "development",
+  isProduction: data.NODE_ENV === "production",
 });

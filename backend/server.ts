@@ -13,6 +13,7 @@ const SHUTDOWN_TIMEOUT = 10_000;
 const KEEPALIVE_TIMEOUT = 65_000;
 const REQUEST_TIMEOUT = 30_000;
 const HEADERS_TIMEOUT = KEEPALIVE_TIMEOUT + 5_000;
+const DRAIN_DELAY = env.isProduction ? 5_000 : 0;
 const LISTEN_ERROR: Readonly<Record<string, string>> = {
   EADDRINUSE: `Port ${PORT} already in use`,
   EACCES: `Required elevated privileges`,
@@ -23,6 +24,7 @@ const startServer = async (): Promise<void> => {
   await connectDB();
 
   const httpServer = createServer(app);
+  server = httpServer;
 
   httpServer.keepAliveTimeout = KEEPALIVE_TIMEOUT;
   httpServer.requestTimeout = REQUEST_TIMEOUT;
@@ -51,9 +53,16 @@ const shutdownServer = async (reason: string, exitCode = 0): Promise<void> => {
       { timeOut: SHUTDOWN_TIMEOUT },
       "Gracious shutdown timed out, forcing exit",
     );
-    server?.closeAllIdealconnections();
+    server?.closeAllConnections();
   }, SHUTDOWN_TIMEOUT);
   forceShutdown.unref();
+  if (exitCode === 0 && DRAIN_DELAY > 0) {
+    logger.info(
+      { drainDelay: DRAIN_DELAY },
+      "Draining connections before closing listener",
+    );
+    await delay(DRAIN_DELAY);
+  }
 };
 
 const attachProcessHandlers = (): void => {
