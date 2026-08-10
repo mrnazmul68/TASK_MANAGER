@@ -7,6 +7,16 @@
     "types": ["node"],
     "rootDir": "./",
     "outDir": "./dist",
+    "paths": {
+      "@app": ["./src/app.ts"],
+      "@modules/*": ["./src/modules/*"],
+      "@shared/*": ["./src/shared*"],
+      "@config/*": ["./src/config/*"],
+      "@middlewares/*": ["./src/middlewares/*"],
+      "@routes/*": ["./src/types/*"],
+      "@dts/*": ["./src/routes/*"],
+      "@utils/*": ["./src/utils/*"]
+    },
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "isolatedModules": true,
@@ -17,6 +27,6 @@
     "forceConsistentCasingInFileNames": true,
     "sourceMap": true
   },
-  "include": ["server.ts","src/**/*"],
+  "include": ["server.ts", "src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
