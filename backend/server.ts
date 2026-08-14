@@ -6,16 +6,6 @@ import { connectDB } from "@config/connectDB.js";
 import { logger } from "@utils/logger.js";
 import { disconnectDB } from "@config/disconnectDB.js";
 
-const exitAfterFlush = async (code: number): Promise<never> => {
-  await Promise.race([
-    new Promise<void>((resolve) => {
-      logger.flush(() => resolve());
-    }),
-    delay(LOG_FLUSH_TIMEOUT),
-  ]).catch(() => undefined);
-  process.exit(code);
-};
-
 let server: Server | null = null;
 let isShuttingDown = false;
 let pendingExitCode = 0;
@@ -33,29 +23,18 @@ const LISTEN_ERROR: Readonly<Record<string, string>> = {
   EACCES: `Required elevated privileges`,
 };
 
-// start server
-const startServer = async (): Promise<void> => {
-  await connectDB();
-
-  const httpServer = createServer(app);
-  server = httpServer;
-
-  httpServer.keepAliveTimeout = KEEPALIVE_TIMEOUT;
-  httpServer.requestTimeout = REQUEST_TIMEOUT;
-  httpServer.headersTimeout = HEADERS_TIMEOUT;
-
-  httpServer.on("error", (error: NodeJS.ErrnoException) => {
-    const listenError = LISTEN_ERROR[error.code ?? ""];
-    logger.fatal(
-      { error, ...(listenError && { PORT: PORT }) },
-      listenError ? `${listenError}` : "Server encountered a fatal error",
-    );
-  });
-  await new Promise<void>((resolve) => {
-    httpServer.listen(PORT, resolve);
-  });
+//todo: shutDown helper funtion
+const exitAfterFlush = async (code: number): Promise<never> => {
+  await Promise.race([
+    new Promise<void>((resolve) => {
+      logger.flush(() => resolve());
+    }),
+    delay(LOG_FLUSH_TIMEOUT),
+  ]).catch(() => undefined);
+  process.exit(code);
 };
 
+// todo: shutDown helper function
 const closeHttpServer = async (): Promise<void> => {
   const activeServer = server;
   if (!activeServer) return;
@@ -66,7 +45,53 @@ const closeHttpServer = async (): Promise<void> => {
   });
   logger.info("HTTP server closed");
 };
-// shutdown
+
+//todo: listener helper function
+const listen = (httpServer: Server, port: number): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
+    httpServer.once("error", reject);
+    httpServer.removeListener("error", reject);
+    resolve();
+  });
+
+//todo: start server
+const startServer = async (): Promise<void> => {
+  await connectDB();
+  const httpServer = createServer(app);
+  server = httpServer;
+
+  httpServer.keepAliveTimeout = KEEPALIVE_TIMEOUT;
+  httpServer.requestTimeout = REQUEST_TIMEOUT;
+  httpServer.headersTimeout = HEADERS_TIMEOUT;
+
+  await listen(httpServer, PORT);
+  httpServer.on("error", (error: NodeJS.ErrnoException) => {
+    logger.fatal({ error }, "Server encountared a fatal error");
+    void shutdownServer("Server error", 1);
+  });
+  logger.info(
+    {
+      PORT: PORT,
+      ENV: env.NODE_ENV,
+      PID: process.pid,
+      VERSION: process.version,
+    },
+    "Server started",
+  );
+  if (env.isDevelopment) {
+    const BASE_URL = `http://localhost:${PORT}`;
+    logger.info(
+      { API: `${BASE_URL}/api/v1`, HEALTH: `${BASE_URL}/health` },
+      "Local endpoints",
+    );
+  }
+
+  await new Promise<void>((resolve) => {
+    httpServer.listen(PORT, resolve);
+  });
+};
+
+//todo: shutdown server
 const shutdownServer = async (reason: string, exitCode = 0): Promise<void> => {
   if (exitCode !== 0 && pendingExitCode === 0) pendingExitCode = exitCode;
   if (isShuttingDown) {
@@ -75,6 +100,7 @@ const shutdownServer = async (reason: string, exitCode = 0): Promise<void> => {
     }
     return;
   }
+
   isShuttingDown = true;
   logger.info({ reason, exitCode }, "Shutting down gracefully");
 
@@ -86,6 +112,7 @@ const shutdownServer = async (reason: string, exitCode = 0): Promise<void> => {
     server?.closeAllConnections();
   }, SHUTDOWN_TIMEOUT);
   forceShutdown.unref();
+
   if (exitCode === 0 && DRAIN_DELAY > 0) {
     logger.info(
       { drainDelay: DRAIN_DELAY },
@@ -93,12 +120,14 @@ const shutdownServer = async (reason: string, exitCode = 0): Promise<void> => {
     );
     await delay(DRAIN_DELAY);
   }
+
   const steps: ReadonlyArray<
     readonly [label: string, close: () => Promise<void>]
   > = [
     ["http server", closeHttpServer],
     ["database connection", disconnectDB],
   ];
+
   let cleanupFailed = false;
   for (const [label, close] of steps) {
     try {
@@ -108,16 +137,25 @@ const shutdownServer = async (reason: string, exitCode = 0): Promise<void> => {
       logger.error({ error }, `Failed to close ${label}`);
     }
   }
+
   clearTimeout(forceShutdown);
   await exitAfterFlush(cleanupFailed ? 1 : pendingExitCode);
 };
 
+//todo: helper function of shutdown error handling setup
 const attachProcessHandlers = (): void => {
   const onFatal =
     (reason: string, level: "fatal" | "error") =>
     (error: unknown): void => {
-      logger[level]({ error }, `${reason} - initial shutdown`);
+      try {
+        logger[level]({ error }, `${reason} - initial shutdown`);
+      } catch {
+        try {
+          logger[level](`${reason}- initial shutdown`);
+        } catch {}
+      }
     };
+
   process.on("uncaughtException", onFatal("uncaughtException", "fatal"));
   process.on("unhandledRejection", onFatal("unhandledRejection", "error"));
 
@@ -129,9 +167,15 @@ const attachProcessHandlers = (): void => {
   }
 };
 
+//todo: run all here
 try {
   await startServer();
 } catch (error) {
-  logger.fatal({ error }, "Failed to start server");
-  process.exit(1);
+  const code = (error as NodeJS.ErrnoException | null)?.code ?? "";
+  const listenError = LISTEN_ERROR[code];
+  logger.fatal(
+    { error, ...(listenError && { PORT: PORT }) },
+    "Failed to start server",
+  );
+  await shutdownServer("startupFailure", 1);
 }
