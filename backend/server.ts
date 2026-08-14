@@ -23,35 +23,14 @@ const LISTEN_ERROR: Readonly<Record<string, string>> = {
   EACCES: `Required elevated privileges`,
 };
 
-//todo: shutDown helper funtion
-const exitAfterFlush = async (code: number): Promise<never> => {
-  await Promise.race([
-    new Promise<void>((resolve) => {
-      logger.flush(() => resolve());
-    }),
-    delay(LOG_FLUSH_TIMEOUT),
-  ]).catch(() => undefined);
-  process.exit(code);
-};
-
-// todo: shutDown helper function
-const closeHttpServer = async (): Promise<void> => {
-  const activeServer = server;
-  if (!activeServer) return;
-  activeServer.closeIdleConnections;
-
-  await new Promise<void>((resolve, reject) => {
-    activeServer.close((err) => (err ? reject(err) : resolve()));
-  });
-  logger.info("HTTP server closed");
-};
-
 //todo: listener helper function
 const listen = (httpServer: Server, port: number): Promise<void> =>
   new Promise<void>((resolve, reject) => {
     httpServer.once("error", reject);
-    httpServer.removeListener("error", reject);
-    resolve();
+    httpServer.listen(PORT, () => {
+      httpServer.removeListener("error", reject);
+      resolve();
+    });
   });
 
 //todo: start server
@@ -89,6 +68,29 @@ const startServer = async (): Promise<void> => {
   await new Promise<void>((resolve) => {
     httpServer.listen(PORT, resolve);
   });
+};
+
+//todo: shutDown helper funtion
+const exitAfterFlush = async (code: number): Promise<never> => {
+  await Promise.race([
+    new Promise<void>((resolve) => {
+      logger.flush(() => resolve());
+    }),
+    delay(LOG_FLUSH_TIMEOUT),
+  ]).catch(() => undefined);
+  process.exit(code);
+};
+
+// todo: shutDown helper function
+const closeHttpServer = async (): Promise<void> => {
+  const activeServer = server;
+  if (!activeServer) return;
+  activeServer.closeIdleConnections;
+
+  await new Promise<void>((resolve, reject) => {
+    activeServer.close((err) => (err ? reject(err) : resolve()));
+  });
+  logger.info("HTTP server closed");
 };
 
 //todo: shutdown server
