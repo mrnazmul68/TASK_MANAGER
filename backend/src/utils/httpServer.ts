@@ -13,6 +13,7 @@ export const listenServer = (httpServer: Server, port: number) => {
 
     httpServer.once("error", onError);
     httpServer.once("listening", onListening);
+
     httpServer.listen(port);
   });
 };
