@@ -17,7 +17,7 @@ export const logger = pino({
       "accessToken",
       "secret",
     ],
-    censor: "[REDUCTED]",
+    censor: "[REDACTED]",
   },
   transport:
     env.NODE_ENV === "development"
