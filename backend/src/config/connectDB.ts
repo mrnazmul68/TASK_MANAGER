@@ -41,9 +41,13 @@ let isDbConnected = (): boolean =>
 const discardClient = async (): Promise<void> => {
   try {
     await mongoose.connection.close();
-  } catch (error) {
+  } catch (error) {``
     logger.error({ error }, "MongoDB failed to connect-cleanup error");
   }
+};
+
+const assertTransactionTopology = async (): Promise<void> => {
+  let hello: Record<string, unknown> | undefined;
 };
 
 const openConnection = async (): Promise<void> => {
@@ -52,6 +56,11 @@ const openConnection = async (): Promise<void> => {
   } catch (error) {
     await discardClient();
     throw new Error("Failed to establish mongodb connection");
+  }
+
+  if (env.isProduction) {
+    try {
+    } catch (error) {}
   }
 };
 
