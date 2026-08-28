@@ -29,7 +29,7 @@ let exitPromise: Promise<never> | null = null;
 let pendingExitCode = 0;
 let drainController: AbortController | null = null;
 
-//todo: log creash safety
+//todo: log creash safely
 const logCrashSafely = (
   level: "fatal" | "error",
   bindings: Record<string, unknown>,
@@ -53,6 +53,7 @@ const closeHttpServer = async (): Promise<void> => {
   httpClosePromise = (async (): Promise<void> => {
     if (listenPromise) await listenPromise;
     if (!activeServer?.listening) return;
+
     const idleSweeper = setInterval(() => {
       activeServer.closeIdleConnections();
     }, IDLE_SWEEP_INTERVAL);
@@ -67,7 +68,7 @@ const closeHttpServer = async (): Promise<void> => {
     logger.info("HTTP server closed");
   })();
 
-  return httpClosePromise;
+  return httpClosePromise; //eta ekta pending promise return korceh, zeta resolve korle undefined pawya zabe. eta js rule
 };
 
 //todo: initial shutdown
@@ -198,7 +199,8 @@ const startServer = async (): Promise<void> => {
   httpServer.requestTimeout = REQUEST_TIMEOUT;
 
   if (shuttingDown) return;
-  const pendingListen = (listenPromise = listenServer(httpServer, env.PORT));
+  const pendingListen = (listenPromise = listenServer(httpServer, env.PORT)); //chained assignment
+
   try {
     await pendingListen;
   } finally {
@@ -209,7 +211,7 @@ const startServer = async (): Promise<void> => {
     return;
   }
   httpServer.on("error", (err: NodeJS.ErrnoException) => {
-    logCrashSafely("fatal", { err }, "server encountered a fatal error");
+    logCrashSafely("fatal", { err }, "Server encountered a fatal error");
     initiateShutdown("serverError", 1);
   });
   logger.info(

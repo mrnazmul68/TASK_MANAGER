@@ -1,7 +1,7 @@
 import type { Server } from "node:http";
 
-export const listenServer = (httpServer: Server, port: number) => {
-  return new Promise<void>((resolve, reject) => {
+export const listenServer = (httpServer: Server, port: number): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
     const onError = (err: Error): void => {
       httpServer.removeListener("listening", onListening);
       reject(err);
@@ -16,4 +16,3 @@ export const listenServer = (httpServer: Server, port: number) => {
 
     httpServer.listen(port);
   });
-};
