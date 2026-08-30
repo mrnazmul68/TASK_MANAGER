@@ -1,8 +1,7 @@
 import { createServer, type Server } from "node:http";
 import { clearInterval } from "node:timers";
 import { setTimeout as delay } from "node:timers/promises";
-import { disconnectDB } from "@config/disconnectDB.js";
-import { connectDB } from "@config/connectDB.js";
+import { connectDb, disconnectDb } from "@config/connectDB.js";
 import { env } from "@config/env.js";
 import { app } from "@app";
 import { logger } from "@utils/logger.js";
@@ -114,7 +113,7 @@ const shutdown = async (reason: string, exitCode: number): Promise<void> => {
     readonly [label: string, close: () => Promise<void>]
   > = [
     ["HTTP server", closeHttpServer],
-    ["database connection", disconnectDB],
+    ["database connection", disconnectDb],
   ];
 
   const forceTimer = setTimeout(() => {
@@ -184,7 +183,7 @@ const attachProcessHandlers = (): void => {
 
 //todo: start server
 const startServer = async (): Promise<void> => {
-  await connectDB();
+  await connectDb();
   if (shuttingDown) return;
   const httpServer = createServer(
     {

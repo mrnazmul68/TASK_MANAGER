@@ -1,4 +1,4 @@
-import mongoose, { type ConnectOptions } from "mongoose";
+import mongoose, { mongo, type ConnectOptions } from "mongoose";
 import { logger } from "@utils/logger.js";
 import { SERVICE_NAME } from "@shared/identity.js";
 import { env } from "@config/env.js";
@@ -34,7 +34,6 @@ const CONNECTION_OPTIONS: ConnectOptions = {
     },
   }),
 };
-
 let isDbConnected = (): boolean =>
   mongoose.connection.readyState === mongoose.ConnectionStates.connected;
 
@@ -71,11 +70,31 @@ const openConnection = async (): Promise<void> => {
 
   if (env.isProduction) {
     try {
-    } catch (error) {}
+      await assertTransactionTopology();
+    } catch (error) {
+      await discardClient();
+      throw error;
+    }
   }
+  hasEstablishedClient = true;
+  const { host, name } = mongoose.connection;
+
+  logger.info(
+    {
+      host,
+      database: name,
+      poolSize: CONNECTION_OPTIONS.maxPoolSize,
+      poolCheckoutTimeout: POOL_CHECKOUT_TIMEOUT,
+      serverSelectionTimeout: SERVER_SELECTION_TIMEOUT,
+      queryTimeout: QUERY_TIMEOUT,
+      autoIndex: CONNECTION_OPTIONS.autoIndex,
+    },
+    "Mongodb connected",
+  );
 };
 
-export const connectDB = async (): Promise<void> => {
+//todo: connect db
+export const connectDb = async (): Promise<void> => {
   if (closingPromise) {
     throw new Error("MongoDb connection is closing");
   }
@@ -85,6 +104,26 @@ export const connectDB = async (): Promise<void> => {
     throw new Error("Mongodb connection is temporarily unavailable");
   }
   const attempt = (connectionPromise = openConnection());
+  const clearThisAttempt = (): void => {
+    if (connectionPromise === attempt) connectionPromise = null;
+  };
+  void attempt.then(clearThisAttempt, clearThisAttempt);
+  return attempt;
+};
+
+const closeConnection = async (): Promise<void> => {
+  const pending = connectionPromise;
+  connectionPromise = null;
+  if (pending) await pending.catch(() => undefined);
+  await mongoose.connection.close();
+  logger.info("Mongodb cleanup completed");
+};
+
+//todo: disconnect db
+export const disconnectDb = async (): Promise<void> => {
+  if (closingPromise) return closingPromise;
+  const closeAttempt = (closingPromise =
+    Promise.resolve().then(closeConnection));
 };
 
 // import mongoose, { type ConnectOptions } from "mongoose";

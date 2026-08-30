@@ -1,8 +1,0 @@
-import { logger } from "@utils/logger.js";
-import mongoose from "mongoose";
-
-export const disconnectDB = async (): Promise<void> => {
-  if (mongoose.connection.readyState === 0) return;
-  await mongoose.connection.close();
-  logger.info("DB connection closed");
-};

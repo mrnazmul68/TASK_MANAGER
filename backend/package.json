@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
-  "scripts": {
-    "dev": "nodemon --exec \"tsx --env-file=.env\" server.ts",
-    "build": "tsc"
-  },
+ "scripts": {
+  "dev": "tsx --env-file=.env --watch server.ts",
+  "build": "tsc"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
