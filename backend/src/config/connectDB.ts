@@ -1,4 +1,4 @@
-import mongoose, { mongo, type ConnectOptions } from "mongoose";
+import mongoose, { type ConnectOptions } from "mongoose";
 import { logger } from "@utils/logger.js";
 import { SERVICE_NAME } from "@shared/identity.js";
 import { env } from "@config/env.js";
@@ -34,6 +34,7 @@ const CONNECTION_OPTIONS: ConnectOptions = {
     },
   }),
 };
+
 let isDbConnected = (): boolean =>
   mongoose.connection.readyState === mongoose.ConnectionStates.connected;
 
@@ -41,7 +42,7 @@ const discardClient = async (): Promise<void> => {
   try {
     await mongoose.connection.close();
   } catch (error) {
-    logger.error({ error }, "MongoDB failed to connect-cleanup error");
+    logger.error({ error }, "MongoDB failed to connect cleanup error");
   }
 };
 
@@ -111,6 +112,7 @@ export const connectDb = async (): Promise<void> => {
   return attempt;
 };
 
+// todo: db disconnect functionality
 const closeConnection = async (): Promise<void> => {
   const pending = connectionPromise;
   connectionPromise = null;
@@ -124,6 +126,13 @@ export const disconnectDb = async (): Promise<void> => {
   if (closingPromise) return closingPromise;
   const closeAttempt = (closingPromise =
     Promise.resolve().then(closeConnection));
+    try{
+      await closeAttempt;
+    }finally{
+      if(closingPromise === closeAttempt) {
+        closingPromise = null;
+      }
+    }
 };
 
 // import mongoose, { type ConnectOptions } from "mongoose";

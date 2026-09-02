@@ -6,6 +6,7 @@ import { env } from "@config/env.js";
 import { app } from "@app";
 import { logger } from "@utils/logger.js";
 import { listenServer } from "@utils/httpServer.js";
+import { isShuttingDown } from "@shared/lifeCycle.js";
 
 const CONNECTION_CHECKING_INTERVAL = 5_000;
 const KEEP_ALIVE_TIMEOUT = 65_000;
@@ -20,7 +21,6 @@ const LISTEN_ERRORS: Readonly<Record<string, string>> = {
   EACCES: "Required elevated privileges",
 };
 
-let shuttingDown = false;
 let server: Server | null = null;
 let httpClosePromise: Promise<void> | null = null;
 let listenPromise: Promise<void> | null = null;
@@ -28,10 +28,16 @@ let exitPromise: Promise<never> | null = null;
 let pendingExitCode = 0;
 let drainController: AbortController | null = null;
 
-//todo: log creash safely
-const logCrashSafely = (
-  level: "fatal" | "error",
-  bindings: Record<string, unknown>,
+//todo: abort gracefull shutdown
+const abortGracefufllShutdown = (): void => {
+  drainController?.abort();
+  server?.closeAllConnections();
+};
+
+//todo: print log safely
+const logSafely = (
+  level: "fatal" | "error" | "warn" | "info",
+  bindings: Record<string, unknown>, //Circular reference / non-serializable object
   message: string,
 ): void => {
   try {
@@ -39,7 +45,7 @@ const logCrashSafely = (
   } catch {
     try {
       logger[level](`${message} error details unserializable`);
-    } catch {}
+    } catch {} //ekhane error ta zodi handle na kori tahole uncatughtException hobe na?
   }
 };
 
@@ -72,11 +78,18 @@ const closeHttpServer = async (): Promise<void> => {
 
 //todo: initial shutdown
 const initiateShutdown = (reason: string, exitCode: number): void => {
-  void shutdown(reason, exitCode).catch((err: unknown) => {
+  void shutdown(reason, exitCode).catch((error: unknown) => {
     pendingExitCode = 1;
     drainController?.abort();
-    server?.closeAllConnections();
-    logCrashSafely("fatal", { err, reason }, "shutdown failed");
+    server?.closeAllConnections(); //ekhane server to off kortechi, tahole db er ki hobe?
+    logSafely(
+      "fatal",
+      {
+        error,
+        reason,
+      },
+      "Shutdown failed",
+    );
     void exitAfterFlush(1);
   });
 };
@@ -84,15 +97,16 @@ const initiateShutdown = (reason: string, exitCode: number): void => {
 //todo: shut down server
 const shutdown = async (reason: string, exitCode: number): Promise<void> => {
   if (exitCode !== 0 && pendingExitCode === 0) pendingExitCode = exitCode;
-  if (shuttingDown) {
+  if (isShuttingDown()) {
     if (exitCode !== 0) {
       drainController?.abort();
       server?.closeAllConnections();
-      logger.error({ reason, exitCode }, "Fatal error during shutdown");
+      logger.error({ reason, pendingExitCode }, "Fatal error during shutdown");
     }
     return;
   }
-  shuttingDown = true;
+  // shuttingDown = true;
+
   logger.info({ reason, exitCode }, "Shutting down HTTP server");
   if (pendingExitCode === 0 && DRAIN_DELAY > 0) {
     logger.info(
@@ -100,10 +114,11 @@ const shutdown = async (reason: string, exitCode: number): Promise<void> => {
       "Draining before closing listener",
     );
     drainController = new AbortController();
+
     try {
       await delay(DRAIN_DELAY, undefined, { signal: drainController.signal });
-    } catch (err) {
-      if (!drainController.signal.aborted) throw err;
+    } catch (error) {
+      if (!drainController.signal.aborted) throw error; //abort na/node er unexpect  error hole throw kora error ta initialShutdown er catch e zabe
     } finally {
       drainController = null;
     }
@@ -121,7 +136,7 @@ const shutdown = async (reason: string, exitCode: number): Promise<void> => {
     try {
       logger.error(
         { timeoutMs: SHUTDOWN_TIMEOUT },
-        "Graceful shutdown timed out, forcing exit",
+        "Graceful shutdown timed out, forcing exit", // ekahne serialization ba circulation reference error holeo initial shutdwon er catch fire hote pare
       );
     } catch {}
     void exitAfterFlush(1);
@@ -130,9 +145,9 @@ const shutdown = async (reason: string, exitCode: number): Promise<void> => {
   for (const [label, close] of steps) {
     try {
       await close();
-    } catch (err) {
+    } catch (error) {
       pendingExitCode = 1;
-      logger.error({ err }, `Failed to close ${label}`);
+      logger.error({ error }, `Failed to close ${label}`); // ekahne serialization ba circulation reference error holeo initial shutdwon er catch fire hote pare
     }
   }
   clearTimeout(forceTimer);
@@ -141,6 +156,7 @@ const shutdown = async (reason: string, exitCode: number): Promise<void> => {
 
 //todo: exit after flush
 const exitAfterFlush = (code: number): Promise<never> => {
+  //এটা never resolve করবে, কারণ ভেতরে process.exit() আছে
   if (code !== 0) pendingExitCode = code;
   exitPromise ??= (async (): Promise<never> => {
     await Promise.race([
@@ -151,28 +167,29 @@ const exitAfterFlush = (code: number): Promise<never> => {
     ]).catch(() => undefined);
     process.exit(pendingExitCode);
   })();
-  return exitPromise;
+  return exitPromise; //return মানে হলো, ফাংশনের ভেতরে যা তৈরি হলো — সেই value-টার একটা reference/handle caller-এর হাতে তুলে দেওয়া।
 };
 
 //todo: process handler
 const attachProcessHandlers = (): void => {
   const onFatal =
     (reason: string, level: "fatal" | "error") =>
-    (err: unknown): void => {
-      logCrashSafely(level, { err }, `${reason} — initiating shutdown`);
+    (error: unknown): void => {
+      logSafely(level, { error }, `${reason} — initiating shutdown`);
       initiateShutdown(reason, 1);
     };
 
+  //ekhane ekta fatal ekta error keno? duitai to amra handle kore shutdwon kortechi?
   process.on("uncaughtException", onFatal("uncaughtException", "fatal"));
-  process.on("unhandledRejection", onFatal("unhandledRejection", "error"));
+  process.on("unhandledRejection", onFatal("unhandledRejection", "error")); // promise resated
 
   const signals: NodeJS.Signals[] = ["SIGTERM", "SIGINT", "SIGQUIT", "SIGHUP"];
   for (const signal of signals) {
     process.on(signal, () => {
-      if (shuttingDown) {
-        try {
-          logger.warn({ signal }, "Repeated termination signal — forcing exit");
-        } catch {}
+      if (isShuttingDown()) {
+        pendingExitCode = 1;
+        abortGracefufllShutdown();
+        logSafely("warn", { signal }, "Repeted termination signal force exit");
         void exitAfterFlush(1);
         return;
       }
@@ -184,7 +201,7 @@ const attachProcessHandlers = (): void => {
 //todo: start server
 const startServer = async (): Promise<void> => {
   await connectDb();
-  if (shuttingDown) return;
+  if (isShuttingDown()) return;
   const httpServer = createServer(
     {
       connectionsCheckingInterval: CONNECTION_CHECKING_INTERVAL,
@@ -197,7 +214,12 @@ const startServer = async (): Promise<void> => {
   httpServer.headersTimeout = HEADERS_TIMEOUT;
   httpServer.requestTimeout = REQUEST_TIMEOUT;
 
-  if (shuttingDown) return;
+  if (isShuttingDown()) return;
+
+  const onServerError = (error: Error): void => {
+    logSafely("fatal", { error }, "Server encountered a fatal error");
+    initiateShutdown("serverError", 1);
+  };
   const pendingListen = (listenPromise = listenServer(httpServer, env.PORT)); //chained assignment
 
   try {
@@ -205,14 +227,11 @@ const startServer = async (): Promise<void> => {
   } finally {
     if (listenPromise === pendingListen) listenPromise = null;
   }
-  if (shuttingDown) {
+  if (isShuttingDown()) {
     await closeHttpServer();
     return;
   }
-  httpServer.on("error", (err: NodeJS.ErrnoException) => {
-    logCrashSafely("fatal", { err }, "Server encountered a fatal error");
-    initiateShutdown("serverError", 1);
-  });
+
   logger.info(
     {
       PORT: env.PORT,
@@ -239,7 +258,7 @@ try {
 } catch (err) {
   const code = (err as NodeJS.ErrnoException | null)?.code ?? "";
   const listenError = LISTEN_ERRORS[code];
-  logCrashSafely(
+  logSafely(
     "fatal",
     { err, ...(listenError && { port: env.PORT }) },
     listenError ? `Port ${env.PORT} ${listenError}` : "Failed to start server",
