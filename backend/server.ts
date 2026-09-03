@@ -7,6 +7,7 @@ import { app } from "@app";
 import { logger } from "@utils/logger.js";
 import { listenServer } from "@utils/httpServer.js";
 import { isShuttingDown } from "@shared/lifeCycle.js";
+import type { AddressInfo } from "node:net";
 
 const CONNECTION_CHECKING_INTERVAL = 5_000;
 const KEEP_ALIVE_TIMEOUT = 65_000;
@@ -23,7 +24,7 @@ const LISTEN_ERRORS: Readonly<Record<string, string>> = {
 
 let server: Server | null = null;
 let httpClosePromise: Promise<void> | null = null;
-let listenPromise: Promise<void> | null = null;
+let listenPromise: Promise<AddressInfo> | null = null;
 let exitPromise: Promise<never> | null = null;
 let pendingExitCode = 0;
 let drainController: AbortController | null = null;
@@ -179,9 +180,8 @@ const attachProcessHandlers = (): void => {
       initiateShutdown(reason, 1);
     };
 
-  //ekhane ekta fatal ekta error keno? duitai to amra handle kore shutdwon kortechi?
   process.on("uncaughtException", onFatal("uncaughtException", "fatal"));
-  process.on("unhandledRejection", onFatal("unhandledRejection", "error")); // promise resated
+  process.on("unhandledRejection", onFatal("unhandledRejection", "error")); // promise er rejection handle na korle, nodejs default behavior hisebe process exit kore dey. tai ekhane handle kora hocche.
 
   const signals: NodeJS.Signals[] = ["SIGTERM", "SIGINT", "SIGQUIT", "SIGHUP"];
   for (const signal of signals) {
@@ -220,16 +220,22 @@ const startServer = async (): Promise<void> => {
     logSafely("fatal", { error }, "Server encountered a fatal error");
     initiateShutdown("serverError", 1);
   };
-  const pendingListen = (listenPromise = listenServer(httpServer, env.PORT)); //chained assignment
+  const pendingListen = (listenPromise = listenServer(
+    httpServer,
+    env.PORT,
+    onServerError,
+  )); //chained assignment
+
+  let address: AddressInfo;
 
   try {
-    await pendingListen;
+    address = await pendingListen;
   } finally {
     if (listenPromise === pendingListen) listenPromise = null;
   }
   if (isShuttingDown()) {
     await closeHttpServer();
-    return;
+    return;``
   }
 
   logger.info(
