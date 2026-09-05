@@ -1,19 +1,17 @@
 import { createServer, type Server } from "node:http";
-import { clearInterval } from "node:timers";
 import { setTimeout as delay } from "node:timers/promises";
 import { connectDb, disconnectDb } from "@config/connectDB.js";
 import { env } from "@config/env.js";
 import { app } from "@app";
 import { logger } from "@utils/logger.js";
-import { listenServer } from "@utils/httpServer.js";
-import { isShuttingDown } from "@shared/lifeCycle.js";
+import { closeServer, listenServer } from "@utils/httpServer.js";
+import { beginShutdwon, isShuttingDown } from "@shared/lifeCycle.js";
 import type { AddressInfo } from "node:net";
 
 const CONNECTION_CHECKING_INTERVAL = 5_000;
 const KEEP_ALIVE_TIMEOUT = 65_000;
 const HEADERS_TIMEOUT = 30_000;
 const REQUEST_TIMEOUT = 30_000;
-const IDLE_SWEEP_INTERVAL = 100;
 const DRAIN_DELAY = env.isProduction ? 5_000 : 0;
 const SHUTDOWN_TIMEOUT = 35_000;
 const LOG_FLUSH_TIMEOUT = 500;
@@ -57,21 +55,15 @@ const closeHttpServer = async (): Promise<void> => {
   if (!activeServer) return;
 
   httpClosePromise = (async (): Promise<void> => {
-    if (listenPromise) await listenPromise;
-    if (!activeServer?.listening) return;
-
-    const idleSweeper = setInterval(() => {
-      activeServer.closeIdleConnections();
-    }, IDLE_SWEEP_INTERVAL);
-
+    let listenError: unknown;
     try {
-      await new Promise<void>((resolve, reject) => {
-        activeServer.close((err) => (err ? reject(err) : resolve()));
-      });
-    } finally {
-      clearInterval(idleSweeper);
+      if (listenPromise) await listenPromise;
+    } catch (error) {
+      listenError = error;
     }
-    logger.info("HTTP server closed");
+    if (await closeServer(activeServer))
+      logSafely("info", {}, "HTTP Server closed");
+    if (listenError) throw listenError;
   })();
 
   return httpClosePromise; //eta ekta pending promise return korceh, zeta resolve korle undefined pawya zabe. eta js rule
@@ -95,22 +87,23 @@ const initiateShutdown = (reason: string, exitCode: number): void => {
   });
 };
 
-//todo: shut down server
+//todo: shutdown server
 const shutdown = async (reason: string, exitCode: number): Promise<void> => {
   if (exitCode !== 0 && pendingExitCode === 0) pendingExitCode = exitCode;
   if (isShuttingDown()) {
     if (exitCode !== 0) {
-      drainController?.abort();
-      server?.closeAllConnections();
-      logger.error({ reason, pendingExitCode }, "Fatal error during shutdown");
+      abortGracefufllShutdown();
+      logSafely("error", { reason, exitCode }, "Fatal error during shutdown");
     }
     return;
   }
-  // shuttingDown = true;
 
+  beginShutdwon();
+  logSafely("info", { reason, exitCode }, "Shutting down");
   logger.info({ reason, exitCode }, "Shutting down HTTP server");
   if (pendingExitCode === 0 && DRAIN_DELAY > 0) {
-    logger.info(
+    logSafely(
+      "info",
       { DRAIN_DELAY: DRAIN_DELAY },
       "Draining before closing listener",
     );
@@ -125,32 +118,17 @@ const shutdown = async (reason: string, exitCode: number): Promise<void> => {
     }
   }
   if (pendingExitCode !== 0) server?.closeAllConnections();
-  const steps: ReadonlyArray<
-    readonly [label: string, close: () => Promise<void>]
-  > = [
-    ["HTTP server", closeHttpServer],
-    ["database connection", disconnectDb],
-  ];
 
   const forceTimer = setTimeout(() => {
     server?.closeAllConnections();
-    try {
-      logger.error(
-        { timeoutMs: SHUTDOWN_TIMEOUT },
-        "Graceful shutdown timed out, forcing exit", // ekahne serialization ba circulation reference error holeo initial shutdwon er catch fire hote pare
-      );
-    } catch {}
+    logSafely(
+      "error",
+      { timeoutMs: SHUTDOWN_TIMEOUT },
+      "Graceful shutdown timed out, forcing exit",
+    );
     void exitAfterFlush(1);
   }, SHUTDOWN_TIMEOUT);
 
-  for (const [label, close] of steps) {
-    try {
-      await close();
-    } catch (error) {
-      pendingExitCode = 1;
-      logger.error({ error }, `Failed to close ${label}`); // ekahne serialization ba circulation reference error holeo initial shutdwon er catch fire hote pare
-    }
-  }
   clearTimeout(forceTimer);
   await exitAfterFlush(pendingExitCode);
 };
@@ -171,7 +149,7 @@ const exitAfterFlush = (code: number): Promise<never> => {
   return exitPromise; //return মানে হলো, ফাংশনের ভেতরে যা তৈরি হলো — সেই value-টার একটা reference/handle caller-এর হাতে তুলে দেওয়া।
 };
 
-//todo: process handler
+//todo: process handler function
 const attachProcessHandlers = (): void => {
   const onFatal =
     (reason: string, level: "fatal" | "error") =>
@@ -179,7 +157,6 @@ const attachProcessHandlers = (): void => {
       logSafely(level, { error }, `${reason} — initiating shutdown`);
       initiateShutdown(reason, 1);
     };
-
   process.on("uncaughtException", onFatal("uncaughtException", "fatal"));
   process.on("unhandledRejection", onFatal("unhandledRejection", "error")); // promise er rejection handle na korle, nodejs default behavior hisebe process exit kore dey. tai ekhane handle kora hocche.
 
@@ -235,12 +212,12 @@ const startServer = async (): Promise<void> => {
   }
   if (isShuttingDown()) {
     await closeHttpServer();
-    return;``
+    return;
   }
 
   logger.info(
     {
-      PORT: env.PORT,
+      PORT: address.port,
       ENV: env.NODE_ENV,
       PID: process.pid,
       NODE: process.version,
