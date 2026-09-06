@@ -64,7 +64,7 @@ const assertTransactionTopology = async (): Promise<void> => {
 const openConnection = async (): Promise<void> => {
   try {
     await mongoose.connect(env.MONGODB_URI, CONNECTION_OPTIONS);
-  } catch (error) {
+  } catch {
     await discardClient();
     throw new Error("Failed to establish mongodb connection");
   }
@@ -126,13 +126,13 @@ export const disconnectDb = async (): Promise<void> => {
   if (closingPromise) return closingPromise;
   const closeAttempt = (closingPromise =
     Promise.resolve().then(closeConnection));
-    try{
-      await closeAttempt;
-    }finally{
-      if(closingPromise === closeAttempt) {
-        closingPromise = null;
-      }
+  try {
+    await closeAttempt;
+  } finally {
+    if (closingPromise === closeAttempt) {
+      closingPromise = null;
     }
+  }
 };
 
 // import mongoose, { type ConnectOptions } from "mongoose";

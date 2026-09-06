@@ -5,7 +5,7 @@ import { env } from "@config/env.js";
 import { app } from "@app";
 import { logger } from "@utils/logger.js";
 import { closeServer, listenServer } from "@utils/httpServer.js";
-import { beginShutdwon, isShuttingDown } from "@shared/lifeCycle.js";
+import { beginShutdown, isShuttingDown } from "@shared/lifeCycle.js";
 import type { AddressInfo } from "node:net";
 
 const CONNECTION_CHECKING_INTERVAL = 5_000;
@@ -27,8 +27,20 @@ let exitPromise: Promise<never> | null = null;
 let pendingExitCode = 0;
 let drainController: AbortController | null = null;
 
-//todo: abort gracefull shutdown
-const abortGracefufllShutdown = (): void => {
+type cleanUpStep = readonly [label: string, close: () => void | Promise<void>];
+
+//run cleanup steps
+const runCleanupStep = async ([label, close]: cleanUpStep): Promise<void> => {
+  try {
+    await close();
+  } catch (err) {
+    pendingExitCode = 1;
+    logSafely("error", { err }, `Failed to close ${label}`);
+  }
+};
+
+//todo: abort graceful shutdown
+const abortGracefulShutdown = (): void => {
   drainController?.abort();
   server?.closeAllConnections();
 };
@@ -44,7 +56,7 @@ const logSafely = (
   } catch {
     try {
       logger[level](`${message} error details unserializable`);
-    } catch {} //ekhane error ta zodi handle na kori tahole uncatughtException hobe na?
+    } catch {}
   }
 };
 
@@ -74,7 +86,7 @@ const initiateShutdown = (reason: string, exitCode: number): void => {
   void shutdown(reason, exitCode).catch((error: unknown) => {
     pendingExitCode = 1;
     drainController?.abort();
-    server?.closeAllConnections(); //ekhane server to off kortechi, tahole db er ki hobe?
+    server?.closeAllConnections();
     logSafely(
       "fatal",
       {
@@ -92,15 +104,14 @@ const shutdown = async (reason: string, exitCode: number): Promise<void> => {
   if (exitCode !== 0 && pendingExitCode === 0) pendingExitCode = exitCode;
   if (isShuttingDown()) {
     if (exitCode !== 0) {
-      abortGracefufllShutdown();
+      abortGracefulShutdown();
       logSafely("error", { reason, exitCode }, "Fatal error during shutdown");
     }
     return;
   }
 
-  beginShutdwon();
-  logSafely("info", { reason, exitCode }, "Shutting down");
-  logger.info({ reason, exitCode }, "Shutting down HTTP server");
+  beginShutdown();
+  logSafely("info", { reason, exitCode }, "Shutting down HTTP server");
   if (pendingExitCode === 0 && DRAIN_DELAY > 0) {
     logSafely(
       "info",
@@ -123,11 +134,15 @@ const shutdown = async (reason: string, exitCode: number): Promise<void> => {
     server?.closeAllConnections();
     logSafely(
       "error",
+
       { timeoutMs: SHUTDOWN_TIMEOUT },
       "Graceful shutdown timed out, forcing exit",
     );
     void exitAfterFlush(1);
   }, SHUTDOWN_TIMEOUT);
+
+  await runCleanupStep(["HTTP server", closeHttpServer]);
+  await runCleanupStep(["Database connection", disconnectDb]);
 
   clearTimeout(forceTimer);
   await exitAfterFlush(pendingExitCode);
@@ -165,8 +180,8 @@ const attachProcessHandlers = (): void => {
     process.on(signal, () => {
       if (isShuttingDown()) {
         pendingExitCode = 1;
-        abortGracefufllShutdown();
-        logSafely("warn", { signal }, "Repeted termination signal force exit");
+        abortGracefulShutdown();
+        logSafely("warn", { signal }, "Repeated termination signal force exit");
         void exitAfterFlush(1);
         return;
       }
@@ -226,7 +241,7 @@ const startServer = async (): Promise<void> => {
   );
 
   if (env.isDevelopment) {
-    const BASE_URL = `http://localhost:${env.PORT}`;
+    const BASE_URL = `http://localhost:${env.PORT}/api/v1`;
     logger.info(
       { API: `${BASE_URL}`, HEALTH: `${BASE_URL}/health` },
       "Local endpoints",

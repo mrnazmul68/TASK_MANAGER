@@ -5,6 +5,7 @@ const IDLE_SWEEP_INTERVAL = 100;
 
 type ServerErrorHandler = (error: Error) => void;
 
+//todo: listen server
 export const listenServer = (
   httpServer: Server,
   port: number,
@@ -44,22 +45,22 @@ export const listenServer = (
         return;
       }
 
-      if (onRunTimeError) {
+      if (onRunTimeError) httpServer.on("error", onRunTimeError);
         detachStartupListeners();
         resolve(address);
-      }
-
-      httpServer.on("error", onBindError);
-      httpServer.on("listening", onListening);
-      try {
-        httpServer.listen(port);
-      } catch (error) {
-        detachStartupListeners();
-        reject(error);
-      }
+      
     };
+    httpServer.on("error", onBindError);
+    httpServer.on("listening", onListening);
+    try {
+      httpServer.listen(port);
+    } catch (error) {
+      detachStartupListeners();
+      reject(error);
+    }
   });
 
+//todo: close server
 export const closeServer = async (httpServer: Server): Promise<boolean> => {
   if (!httpServer.listening) return false;
   const idleSweeper = setInterval(() => {

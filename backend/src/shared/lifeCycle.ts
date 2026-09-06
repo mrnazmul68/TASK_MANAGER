@@ -2,7 +2,6 @@ let shuttingDown = false;
 
 export const isShuttingDown = (): boolean => shuttingDown;
 
-export const beginShutdwon = ():void=>{
-    shuttingDown = true;
-    
-}
+export const beginShutdown = (): void => {
+  shuttingDown = true;
+};

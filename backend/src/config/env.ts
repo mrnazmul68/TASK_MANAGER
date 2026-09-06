@@ -15,7 +15,7 @@ const envSchema = z.object({
     .string()
     .trim()
     .min(1, "Mongodb uri is required")
-    .max(500, "Mongodb uri cannot be exceed 1000 characters")
+    .max(500, "MongoDB URI cannot exceed 500 characters")
     .startsWith("mongodb", {
       message: "MongoDB uri must start with mongodb",
     }),
