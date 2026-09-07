@@ -46,9 +46,8 @@ export const listenServer = (
       }
 
       if (onRunTimeError) httpServer.on("error", onRunTimeError);
-        detachStartupListeners();
-        resolve(address);
-      
+      detachStartupListeners();
+      resolve(address);
     };
     httpServer.on("error", onBindError);
     httpServer.on("listening", onListening);

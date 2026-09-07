@@ -29,7 +29,7 @@ let drainController: AbortController | null = null;
 
 type cleanUpStep = readonly [label: string, close: () => void | Promise<void>];
 
-//run cleanup steps
+//todo:run cleanup steps
 const runCleanupStep = async ([label, close]: cleanUpStep): Promise<void> => {
   try {
     await close();
@@ -85,16 +85,8 @@ const closeHttpServer = async (): Promise<void> => {
 const initiateShutdown = (reason: string, exitCode: number): void => {
   void shutdown(reason, exitCode).catch((error: unknown) => {
     pendingExitCode = 1;
-    drainController?.abort();
-    server?.closeAllConnections();
-    logSafely(
-      "fatal",
-      {
-        error,
-        reason,
-      },
-      "Shutdown failed",
-    );
+   abortGracefulShutdown();
+   logSafely("fatal", { error, reason }, "Fatal error during shutdown");
     void exitAfterFlush(1);
   });
 };
