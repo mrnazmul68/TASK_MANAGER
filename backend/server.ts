@@ -27,10 +27,10 @@ let exitPromise: Promise<never> | null = null;
 let pendingExitCode = 0;
 let drainController: AbortController | null = null;
 
-type cleanUpStep = readonly [label: string, close: () => void | Promise<void>];
+type CleanUpStep = readonly [label: string, close: () => void | Promise<void>];
 
 //todo:run cleanup steps
-const runCleanupStep = async ([label, close]: cleanUpStep): Promise<void> => {
+const runCleanupStep = async ([label, close]: CleanUpStep): Promise<void> => {
   try {
     await close();
   } catch (err) {
@@ -85,8 +85,8 @@ const closeHttpServer = async (): Promise<void> => {
 const initiateShutdown = (reason: string, exitCode: number): void => {
   void shutdown(reason, exitCode).catch((error: unknown) => {
     pendingExitCode = 1;
-   abortGracefulShutdown();
-   logSafely("fatal", { error, reason }, "Fatal error during shutdown");
+    abortGracefulShutdown();
+    logSafely("fatal", { error, reason }, "Fatal error during shutdown");
     void exitAfterFlush(1);
   });
 };
@@ -102,7 +102,9 @@ const shutdown = async (reason: string, exitCode: number): Promise<void> => {
     return;
   }
 
+
   beginShutdown();
+  
   logSafely("info", { reason, exitCode }, "Shutting down HTTP server");
   if (pendingExitCode === 0 && DRAIN_DELAY > 0) {
     logSafely(
