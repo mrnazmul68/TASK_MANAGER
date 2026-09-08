@@ -1,8 +1,9 @@
 import z from "zod";
 import { integerFromEnv } from "./primitives.js";
 
+const PORT_BOUNDS = { min: 1, max: 65535 } as const;
 const envSchema = z.object({
-  PORT: integerFromEnv(),
+  PORT: integerFromEnv(5000, PORT_BOUNDS),
   NODE_ENV: z.enum(["development", "production"]).default("development"),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace"])
