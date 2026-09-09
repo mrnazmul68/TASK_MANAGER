@@ -1,4 +1,4 @@
-import type z from "zod";
+import z from "zod";
 
 export type IntegerBounds = Readonly<{ min: number; max: number }>;
 
@@ -24,8 +24,22 @@ const assertIntegerConfiguration = (
   }
 };
 
+const blankToUndefined = (
+  value: unknown,
+  mode: "trim" | "preserve",
+): unknown => {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  if (trimmed === "") return undefined;
+  return mode === "trim" ? trimmed : value;
+};
+
 const blankAsAbsent = <T extends z.ZodType>(schema: T) => {
-  z.preprocess((value) => blankToUndefined(value, "trim"), schema.optional());
+  z.preprocess((value) => blankToUndefined(value, "trim"), schema.optional())
+  .transform((value, ctx)=>{
+    if(value === undefined) rejects(ctx, 'is required')
+      return value;
+  }) as unknown as z.ZodPreprocess<T>
 };
 
 export const integerFromEnv = (fallback: number, bounds: IntegerBounds) => {

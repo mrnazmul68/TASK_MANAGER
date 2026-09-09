@@ -102,9 +102,8 @@ const shutdown = async (reason: string, exitCode: number): Promise<void> => {
     return;
   }
 
-
   beginShutdown();
-  
+
   logSafely("info", { reason, exitCode }, "Shutting down HTTP server");
   if (pendingExitCode === 0 && DRAIN_DELAY > 0) {
     logSafely(
