@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
 import { connectDb, disconnectDb } from "@config/connectDB.js";
 import { env } from "@config/env.js";
-import { app } from "@app";
+import { API_TIMEOUT, app } from "@app";
 import { logger } from "@utils/logger.js";
 import { closeServer, listenServer } from "@utils/httpServer.js";
 import { beginShutdown, isShuttingDown } from "@shared/lifeCycle.js";
@@ -13,12 +13,19 @@ const KEEP_ALIVE_TIMEOUT = 65_000;
 const HEADERS_TIMEOUT = 30_000;
 const REQUEST_TIMEOUT = 30_000;
 const DRAIN_DELAY = env.isProduction ? 5_000 : 0;
-const SHUTDOWN_TIMEOUT = 35_000;
+const CLEANUP_MARGIN = 15_000;
+const REQUEST_TAIL =
+  REQUEST_TIMEOUT + Math.max(CONNECTION_CHECKING_INTERVAL, API_TIMEOUT);
+const SHUTDOWN_TIMEOUT = REQUEST_TAIL + CLEANUP_MARGIN;
 const LOG_FLUSH_TIMEOUT = 500;
+const TERMINATION_DEADLINE = DRAIN_DELAY + SHUTDOWN_TIMEOUT + LOG_FLUSH_TIMEOUT;
 const LISTEN_ERRORS: Readonly<Record<string, string>> = {
   EADDRINUSE: "is already in use",
   EACCES: "Required elevated privileges",
 };
+
+//todo: runCleanupStep ta dekhte hobe, 
+//todo: exitAfterFlush e exit ta clear korte hobe.
 
 let server: Server | null = null;
 let httpClosePromise: Promise<void> | null = null;
@@ -56,7 +63,7 @@ const logSafely = (
   } catch {
     try {
       logger[level](`${message} error details unserializable`);
-    } catch {}
+    } catch { }
   }
 };
 
@@ -161,10 +168,10 @@ const exitAfterFlush = (code: number): Promise<never> => {
 const attachProcessHandlers = (): void => {
   const onFatal =
     (reason: string, level: "fatal" | "error") =>
-    (error: unknown): void => {
-      logSafely(level, { error }, `${reason} — initiating shutdown`);
-      initiateShutdown(reason, 1);
-    };
+      (error: unknown): void => {
+        logSafely(level, { error }, `${reason} — initiating shutdown`);
+        initiateShutdown(reason, 1);
+      };
   process.on("uncaughtException", onFatal("uncaughtException", "fatal"));
   process.on("unhandledRejection", onFatal("unhandledRejection", "error")); // promise er rejection handle na korle, nodejs default behavior hisebe process exit kore dey. tai ekhane handle kora hocche.
 
@@ -229,12 +236,13 @@ const startServer = async (): Promise<void> => {
       ENV: env.NODE_ENV,
       PID: process.pid,
       NODE: process.version,
+      TERMINATION_DEADLINE: TERMINATION_DEADLINE,
     },
     "Server started",
   );
 
   if (env.isDevelopment) {
-    const BASE_URL = `http://localhost:${env.PORT}/api/v1`;
+    const BASE_URL = `http://localhost:${address.port}/api/v1`;
     logger.info(
       { API: `${BASE_URL}`, HEALTH: `${BASE_URL}/health` },
       "Local endpoints",

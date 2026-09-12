@@ -23,7 +23,6 @@ export const listenServer = (
     };
 
     const onListening = (): void => {
-      detachStartupListeners();
       const address = httpServer.address();
       if (address === null || typeof address === "string") {
         const error = new Error(
