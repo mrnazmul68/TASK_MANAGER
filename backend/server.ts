@@ -24,7 +24,7 @@ const LISTEN_ERRORS: Readonly<Record<string, string>> = {
   EACCES: "Required elevated privileges",
 };
 
-//todo: runCleanupStep ta dekhte hobe, 
+//todo: runCleanupStep ta dekhte hobe,
 //todo: exitAfterFlush e exit ta clear korte hobe.
 
 let server: Server | null = null;
@@ -63,7 +63,7 @@ const logSafely = (
   } catch {
     try {
       logger[level](`${message} error details unserializable`);
-    } catch { }
+    } catch {}
   }
 };
 
@@ -168,10 +168,10 @@ const exitAfterFlush = (code: number): Promise<never> => {
 const attachProcessHandlers = (): void => {
   const onFatal =
     (reason: string, level: "fatal" | "error") =>
-      (error: unknown): void => {
-        logSafely(level, { error }, `${reason} — initiating shutdown`);
-        initiateShutdown(reason, 1);
-      };
+    (error: unknown): void => {
+      logSafely(level, { error }, `${reason} — initiating shutdown`);
+      initiateShutdown(reason, 1);
+    };
   process.on("uncaughtException", onFatal("uncaughtException", "fatal"));
   process.on("unhandledRejection", onFatal("unhandledRejection", "error")); // promise er rejection handle na korle, nodejs default behavior hisebe process exit kore dey. tai ekhane handle kora hocche.
 
