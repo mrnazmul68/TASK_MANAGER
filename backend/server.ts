@@ -150,7 +150,6 @@ const shutdown = async (reason: string, exitCode: number): Promise<void> => {
 
 //todo: exit after flush
 const exitAfterFlush = (code: number): Promise<never> => {
-  //এটা never resolve করবে, কারণ ভেতরে process.exit() আছে
   if (code !== 0) pendingExitCode = code;
   exitPromise ??= (async (): Promise<never> => {
     await Promise.race([
@@ -161,7 +160,7 @@ const exitAfterFlush = (code: number): Promise<never> => {
     ]).catch(() => undefined);
     process.exit(pendingExitCode);
   })();
-  return exitPromise; //return মানে হলো, ফাংশনের ভেতরে যা তৈরি হলো — সেই value-টার একটা reference/handle caller-এর হাতে তুলে দেওয়া।
+  return exitPromise;
 };
 
 //todo: process handler function
@@ -200,6 +199,8 @@ const startServer = async (): Promise<void> => {
     },
     app,
   );
+
+  
 
   server = httpServer;
   httpServer.keepAliveTimeout = KEEP_ALIVE_TIMEOUT;

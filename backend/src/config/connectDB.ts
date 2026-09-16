@@ -42,7 +42,7 @@ const discardClient = async (): Promise<void> => {
   try {
     await mongoose.connection.close();
   } catch (error) {
-    logger.error({ error }, "MongoDB failed to connect cleanup error");
+    logger.error({ error }, "MongoDB failed to connect, cleanup error");
   }
 };
 
