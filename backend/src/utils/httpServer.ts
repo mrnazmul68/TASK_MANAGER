@@ -48,8 +48,10 @@ export const listenServer = (
       detachStartupListeners();
       resolve(address);
     };
+
     httpServer.on("error", onBindError);
     httpServer.on("listening", onListening);
+
     try {
       httpServer.listen(port);
     } catch (error) {

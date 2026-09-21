@@ -35,9 +35,11 @@ const CONNECTION_OPTIONS: ConnectOptions = {
   }),
 };
 
+//todo: is db connected
 let isDbConnected = (): boolean =>
   mongoose.connection.readyState === mongoose.ConnectionStates.connected;
 
+//todo: discard client
 const discardClient = async (): Promise<void> => {
   try {
     await mongoose.connection.close();
@@ -46,6 +48,7 @@ const discardClient = async (): Promise<void> => {
   }
 };
 
+//todo: assert tansiction topoloy
 const assertTransactionTopology = async (): Promise<void> => {
   let hello: Record<string, unknown> | undefined;
   try {
@@ -57,10 +60,11 @@ const assertTransactionTopology = async (): Promise<void> => {
   }
   if (hello?.setName || hello?.msg === "isdbgrid") return;
   throw new Error(
-    "Production Mongodb must be a replica set or a shared cluster - a standalon server cannot run the transactions this service depends on",
+    "Production Mongodb must be a replica set or a shared cluster - a standalone server cannot run the transactions this service depends on",
   );
 };
 
+//todo: open connection
 const openConnection = async (): Promise<void> => {
   try {
     await mongoose.connect(env.MONGODB_URI, CONNECTION_OPTIONS);
@@ -104,11 +108,12 @@ export const connectDb = async (): Promise<void> => {
   if (hasEstablishedClient) {
     throw new Error("Mongodb connection is temporarily unavailable");
   }
+
   const attempt = (connectionPromise = openConnection());
   const clearThisAttempt = (): void => {
     if (connectionPromise === attempt) connectionPromise = null;
   };
-  void attempt.then(clearThisAttempt, clearThisAttempt);
+  void attempt.then(clearThisAttempt).catch(clearThisAttempt);
   return attempt;
 };
 

@@ -200,8 +200,6 @@ const startServer = async (): Promise<void> => {
     app,
   );
 
-  
-
   server = httpServer;
   httpServer.keepAliveTimeout = KEEP_ALIVE_TIMEOUT;
   httpServer.headersTimeout = HEADERS_TIMEOUT;
@@ -255,12 +253,12 @@ const startServer = async (): Promise<void> => {
 attachProcessHandlers();
 try {
   await startServer();
-} catch (err) {
-  const code = (err as NodeJS.ErrnoException | null)?.code ?? "";
+} catch (error) {
+  const code = (error as NodeJS.ErrnoException | null)?.code ?? "";
   const listenError = LISTEN_ERRORS[code];
   logSafely(
     "fatal",
-    { err, ...(listenError && { port: env.PORT }) },
+    { error, ...(listenError && { port: env.PORT }) },
     listenError ? `Port ${env.PORT} ${listenError}` : "Failed to start server",
   );
   await shutdown("startupFailure", 1);
