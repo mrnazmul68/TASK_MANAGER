@@ -8,6 +8,7 @@ export interface RegisterInput {
   password?: string;
 }
 
+//todo: register user
 export const registerUser = async (input: RegisterInput) => {
   const { name, email, password } = input;
   if (!name || !email || !password) {
