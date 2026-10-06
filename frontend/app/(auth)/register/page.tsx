@@ -2,8 +2,10 @@ import React from 'react'
 import {Button} from "@/components/ui/Button";
 import {Input} from "@/components/ui/Input";
 import {AlertCircle} from "lucide-react";
+import { useAuthActions } from '@/hooks/useAuthContext';
 
 const Page = () => {
+  const {register: registerUser} = useAuthActions()
   return (
     <div className="flex min-h-[80vh] items-center justify-center">
       <div className="w-full max-w-md p-8 bg-[#1e293b] rounded-2xl shadow-2xl border border-white/10">
