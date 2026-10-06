@@ -32,3 +32,4 @@ export const registerUser = async (input: RegisterInput) => {
   });
   return { user: toAuthUser(user) };
 };
+

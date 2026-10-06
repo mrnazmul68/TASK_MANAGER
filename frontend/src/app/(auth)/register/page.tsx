@@ -1,5 +1,6 @@
+"use client"
 import React from 'react'
-import {Button} from "@/components/ui/Button";
+import { Button } from '@/components/ui/Button';
 import {Input} from "@/components/ui/Input";
 import {AlertCircle} from "lucide-react";
 import { useAuthActions } from '@/hooks/useAuthContext';
