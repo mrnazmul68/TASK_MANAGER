@@ -8,7 +8,10 @@ export interface AuthState {
   error: string | null;
 }
 
-type AuthAction = { type: typeof AUTH_ACTIONS.SET_LOADING; payload: boolean };
+type AuthAction = {
+  type: typeof AUTH_ACTIONS.SET_LOADING;
+  payload: boolean;
+};
 
 export const authReducer = (state: AuthState, action: AuthAction) => {
   switch (action.type) {
@@ -17,5 +20,7 @@ export const authReducer = (state: AuthState, action: AuthAction) => {
         ...state,
         isLoading: action.payload,
       };
+    default:
+      return state;
   }
 };
