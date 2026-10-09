@@ -1,5 +1,5 @@
 import { apiClient } from "@/services/axios";
-import { ApiResponse, AuthResponseData } from "@/types/intex";
+import { ApiResponse, AuthResponseData } from "@/types";
 
 interface RegisterData {
   name: string;

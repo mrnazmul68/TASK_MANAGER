@@ -18,19 +18,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     async (data: { name: string; email: string; password: string }) => {
       dispatch({
         type: AUTH_ACTIONS.SET_LOADING,
-        payload: false,
+        payload: true,
       });
       try {
         const { user } = await authService.register(data);
       } catch (error) {
         console.log(error);
-      }
+      } 
     },
 
     [],
   );
 
-  const actionValue = { register };
+  const actionsValue = { register };
 
   return (
     <AuthActionsContext.Provider value={actionsValue}>

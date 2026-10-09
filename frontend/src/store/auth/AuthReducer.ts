@@ -1,4 +1,4 @@
-import { User } from "@/types/intex";
+import { User } from "@/types";
 import { AUTH_ACTIONS } from "./AuthActions";
 
 export interface AuthState {

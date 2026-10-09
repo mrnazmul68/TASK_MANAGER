@@ -33,7 +33,6 @@ const SIZE_CLASSES: Record<ButtonSize, string> = {
   md: "text-sm px-4 py-2",
   lg: "text-base px-6 py-3",
 };
-
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   function Button(
     {
