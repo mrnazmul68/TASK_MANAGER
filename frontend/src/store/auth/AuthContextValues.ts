@@ -1,4 +1,5 @@
 import { createContext } from "react";
+import { AuthState } from "@/store/auth/AuthReducer";
 
 export interface AuthActionsValue {
   register: (data: {
@@ -8,4 +9,5 @@ export interface AuthActionsValue {
   }) => Promise<boolean>;
 }
 
+export const AuthStateContext = createContext<AuthState | null>(null);
 export const AuthActionsContext = createContext<AuthActionsValue | null>(null);

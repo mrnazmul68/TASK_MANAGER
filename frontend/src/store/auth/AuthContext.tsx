@@ -1,8 +1,9 @@
 import { authReducer, AuthState } from "@/store/auth/AuthReducer";
-import { ReactNode, useCallback, useReducer } from "react";
+import { ReactNode, useCallback, useMemo, useReducer } from "react";
 import { AUTH_ACTIONS } from "./AuthActions";
-import { AuthActionsContext } from "./AuthContextValues";
+import { AuthActionsContext, AuthActionsValue, AuthStateContext } from "@/store/auth/AuthContextValues";
 import { authService } from "@/services/authService";
+import { setUser } from "@/lib/storage";
 
 const initial_state: AuthState = {
   user: null,
@@ -22,19 +23,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       try {
         const { user } = await authService.register(data);
+        setUser(user);
+        dispatch({
+          type:AUTH_ACTIONS.LOGIN_SUCCESS,
+          payload: {user}
+        })
+        return true
       } catch (error) {
         console.log(error);
-      } 
+      }
     },
 
     [],
   );
 
-  const actionsValue = { register };
+  const actionsValue = useMemo<AuthActionsValue>(()=>({register}), [register])
 
   return (
-    <AuthActionsContext.Provider value={actionsValue}>
-      {children}
-    </AuthActionsContext.Provider>
+    <AuthStateContext value={state}>
+      <AuthActionsContext.Provider value={actionsValue}>
+        {children}
+      </AuthActionsContext.Provider>
+    </AuthStateContext>
   );
 };
