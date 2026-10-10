@@ -13,7 +13,8 @@ type AuthAction =
       type: typeof AUTH_ACTIONS.SET_LOADING;
       payload: boolean;
     }
-  | { type: typeof AUTH_ACTIONS.LOGIN_SUCCESS; payload: { user: User } };
+  | { type: typeof AUTH_ACTIONS.LOGIN_SUCCESS; payload: { user: User } }
+  | { type: typeof AUTH_ACTIONS.SET_ERROR; payload: string | null };
 
 export const authReducer = (state: AuthState, action: AuthAction) => {
   switch (action.type) {
@@ -30,6 +31,12 @@ export const authReducer = (state: AuthState, action: AuthAction) => {
         isAuthenticated: true,
         isLoading: false,
         error: null,
+      };
+    case AUTH_ACTIONS.SET_ERROR:
+      return {
+        ...state,
+        error: action.payload,
+        isLoading: false,
       };
     default:
       return state;
