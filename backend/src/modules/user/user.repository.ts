@@ -7,7 +7,7 @@ interface CreateUser {
 }
 
 //todo: find user by email
-export const findByEmail = async (email: string) => User.findOne({ email });
+export const findByEmail = (email: string) => User.findOne({ email });
 
 //todo: create user
-export const createUser = async (userData: CreateUser) => User.create(userData);
+export const createUser = (userData: CreateUser) => User.create(userData);
