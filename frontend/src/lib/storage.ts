@@ -1,5 +1,5 @@
 const keys = Object.freeze({
-  user: "atuh_user",
+  user: "auth_user",
 });
 
 const hasStorage = (): boolean =>

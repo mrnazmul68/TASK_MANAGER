@@ -6,8 +6,8 @@ interface CreateUser {
   password: string;
 }
 
-//todo: find user by email
+// find user by email
 export const findByEmail = (email: string) => User.findOne({ email });
 
-//todo: create user
+// create user
 export const createUser = (userData: CreateUser) => User.create(userData);

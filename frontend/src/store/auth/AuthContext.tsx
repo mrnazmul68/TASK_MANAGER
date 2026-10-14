@@ -17,9 +17,11 @@ const initial_state: AuthState = {
   error: null,
 };
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+
+export const AuthProvider = ({ children }:{children: ReactNode} ) => {
   const [state, dispatch] = useReducer(authReducer, initial_state);
 
+  
   const register = useCallback(
     async (data: { name: string; email: string; password: string }) => {
       dispatch({
