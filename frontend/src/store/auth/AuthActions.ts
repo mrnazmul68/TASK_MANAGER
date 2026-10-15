@@ -1,5 +1,0 @@
-export const AUTH_ACTIONS = Object.freeze({
-  SET_LOADING: "SET_LOADING",
-  LOGIN_SUCCESS: "LOGIN_SUCCESS",
-  SET_ERROR: "SET_ERROR",
-});
