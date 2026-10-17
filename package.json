@@ -2,12 +2,19 @@
   "name": "task-vault",
   "private": true,
   "version": "1.0.0",
+  "packageManager": "pnpm@11.25.0",
   "scripts": {
-     "dev": "pnpm -r --parallel dev",
-    "build": "pnpm -r build"
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "check-types": "turbo run check-types"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "turbo": "^2.11.8"
+  }
 }
