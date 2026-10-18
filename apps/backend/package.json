@@ -12,7 +12,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-     "@task-vault/shared": "workspace:*",
+    "@task-vault/shared": "workspace:*",
     "bcryptjs": "^3.0.3",
     "express": "^5.2.1",
     "mongoose": "^9.8.1",

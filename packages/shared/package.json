@@ -11,6 +11,10 @@
     "./constants": {
       "types": "./src/constants.ts",
       "import": "./src/constants.ts"
+    },
+    "./validation": {
+      "types": "./src/http/validation.ts",
+      "import": "./src/http/validation.ts"
     }
   },
   "type": "module",
